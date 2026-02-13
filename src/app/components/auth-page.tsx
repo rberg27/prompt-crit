@@ -7,6 +7,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ArrowRight } from 'lucide-react';
 import { projectId, publicAnonKey } from '../../../utils/supabase/info';
 
+// Demo mode is only enabled when VITE_DEMO_MODE is explicitly set to 'true'
+const DEMO_MODE_ENABLED = import.meta.env.VITE_DEMO_MODE === 'true';
+
 interface AuthPageProps {
   onLogin: (user: any, accessToken: string) => void;
 }
@@ -243,30 +246,32 @@ export function AuthPage({ onLogin }: AuthPageProps) {
             </TabsContent>
           </Tabs>
 
-          {/* Dummy Login Section */}
-          <div className="mt-8 pt-8 border-t-2 border-gray-200">
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-4">
-              Quick Demo Access
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handleDummyLogin('organizer')}
-                className="h-11 border-2 border-gray-200 hover:border-orange-500 hover:bg-orange-50 font-bold"
-              >
-                Organizer
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handleDummyLogin('student')}
-                className="h-11 border-2 border-gray-200 hover:border-orange-500 hover:bg-orange-50 font-bold"
-              >
-                Student
-              </Button>
+          {/* Demo Login Section - Only shown when VITE_DEMO_MODE=true */}
+          {DEMO_MODE_ENABLED && (
+            <div className="mt-8 pt-8 border-t-2 border-gray-200">
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-4">
+                Quick Demo Access
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleDummyLogin('organizer')}
+                  className="h-11 border-2 border-gray-200 hover:border-orange-500 hover:bg-orange-50 font-bold"
+                >
+                  Organizer
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleDummyLogin('student')}
+                  className="h-11 border-2 border-gray-200 hover:border-orange-500 hover:bg-orange-50 font-bold"
+                >
+                  Student
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
-import { Plus, Users, Play, LogOut, TrendingUp, ArrowRight } from 'lucide-react';
+import { Plus, Users, Play, LogOut, TrendingUp, ArrowRight, CheckCircle, Archive, RotateCcw, FastForward } from 'lucide-react';
 import { toast } from 'sonner';
 import { projectId, publicAnonKey } from '../../../utils/supabase/info';
 
@@ -178,6 +178,98 @@ export function OrganizerDashboard({ user, accessToken, onLogout }: OrganizerDas
     }
   };
 
+  const advanceSession = async (session: any) => {
+    try {
+      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-5742cd96/session/${session.id}/advance`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        toast.success('Session advanced to critique phase!');
+        loadSessions();
+        setProgressDialogOpen(false);
+      } else {
+        toast.error(data.error || 'Failed to advance session');
+      }
+    } catch (error) {
+      console.error('Error advancing session:', error);
+      toast.error('Failed to advance session');
+    }
+  };
+
+  const completeSession = async (session: any) => {
+    try {
+      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-5742cd96/session/${session.id}/complete`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        toast.success('Session completed!');
+        loadSessions();
+        setProgressDialogOpen(false);
+      } else {
+        toast.error(data.error || 'Failed to complete session');
+      }
+    } catch (error) {
+      console.error('Error completing session:', error);
+      toast.error('Failed to complete session');
+    }
+  };
+
+  const reopenSession = async (session: any, phase: string) => {
+    try {
+      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-5742cd96/session/${session.id}/reopen`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ phase })
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        toast.success(`Session reopened to ${phase} phase!`);
+        loadSessions();
+      } else {
+        toast.error(data.error || 'Failed to reopen session');
+      }
+    } catch (error) {
+      console.error('Error reopening session:', error);
+      toast.error('Failed to reopen session');
+    }
+  };
+
+  const archiveSession = async (session: any) => {
+    try {
+      const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-5742cd96/session/${session.id}/archive`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        toast.success('Session archived!');
+        loadSessions();
+      } else {
+        toast.error(data.error || 'Failed to archive session');
+      }
+    } catch (error) {
+      console.error('Error archiving session:', error);
+      toast.error('Failed to archive session');
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const variants: any = {
       setup: 'secondary',
@@ -273,7 +365,8 @@ export function OrganizerDashboard({ user, accessToken, onLogout }: OrganizerDas
                   session.status === 'setup' ? 'bg-gray-400' :
                   session.status === 'reflection' ? 'bg-purple-800' :
                   session.status === 'critique' ? 'bg-orange-500' :
-                  'bg-green-500'
+                  session.status === 'complete' ? 'bg-green-500' :
+                  'bg-gray-300'
                 }`}></div>
 
                 <div className="p-6">
@@ -291,18 +384,20 @@ export function OrganizerDashboard({ user, accessToken, onLogout }: OrganizerDas
                   </div>
 
                   <div className="space-y-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full border-2 border-black hover:bg-black hover:text-white font-bold h-10"
-                      onClick={() => {
-                        setSelectedSession(session);
-                        setRosterDialogOpen(true);
-                      }}
-                    >
-                      <Users className="w-4 h-4 mr-2" />
-                      Manage Roster
-                    </Button>
+                    {session.status !== 'archived' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full border-2 border-black hover:bg-black hover:text-white font-bold h-10"
+                        onClick={() => {
+                          setSelectedSession(session);
+                          setRosterDialogOpen(true);
+                        }}
+                      >
+                        <Users className="w-4 h-4 mr-2" />
+                        Manage Roster
+                      </Button>
+                    )}
 
                     {session.status === 'setup' && (
                       <Button
@@ -315,7 +410,7 @@ export function OrganizerDashboard({ user, accessToken, onLogout }: OrganizerDas
                       </Button>
                     )}
 
-                    {session.status !== 'setup' && (
+                    {(session.status === 'reflection' || session.status === 'critique') && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -324,6 +419,72 @@ export function OrganizerDashboard({ user, accessToken, onLogout }: OrganizerDas
                       >
                         <TrendingUp className="w-4 h-4 mr-2" />
                         View Progress
+                      </Button>
+                    )}
+
+                    {session.status === 'reflection' && (
+                      <Button
+                        size="sm"
+                        className="w-full bg-purple-800 hover:bg-purple-900 text-white font-bold h-10"
+                        onClick={() => advanceSession(session)}
+                      >
+                        <FastForward className="w-4 h-4 mr-2" />
+                        Start Critique Phase
+                      </Button>
+                    )}
+
+                    {session.status === 'critique' && (
+                      <Button
+                        size="sm"
+                        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-10"
+                        onClick={() => completeSession(session)}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        End Session
+                      </Button>
+                    )}
+
+                    {session.status === 'complete' && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full border-2 border-purple-800 text-purple-800 hover:bg-purple-800 hover:text-white font-bold h-10"
+                          onClick={() => viewProgress(session)}
+                        >
+                          <TrendingUp className="w-4 h-4 mr-2" />
+                          View Summary
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full border-2 border-gray-400 text-gray-600 hover:bg-gray-100 font-bold h-10"
+                          onClick={() => reopenSession(session, 'critique')}
+                        >
+                          <RotateCcw className="w-4 h-4 mr-2" />
+                          Reopen
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full border-2 border-gray-400 text-gray-600 hover:bg-gray-100 font-bold h-10"
+                          onClick={() => archiveSession(session)}
+                        >
+                          <Archive className="w-4 h-4 mr-2" />
+                          Archive
+                        </Button>
+                      </>
+                    )}
+
+                    {session.status === 'archived' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full border-2 border-gray-400 text-gray-600 hover:bg-gray-100 font-bold h-10"
+                        onClick={() => reopenSession(session, 'critique')}
+                      >
+                        <RotateCcw className="w-4 h-4 mr-2" />
+                        Restore
                       </Button>
                     )}
                   </div>
@@ -362,7 +523,17 @@ export function OrganizerDashboard({ user, accessToken, onLogout }: OrganizerDas
       <Dialog open={progressDialogOpen} onOpenChange={setProgressDialogOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Session Progress - {selectedSession?.name}</DialogTitle>
+            <DialogTitle className="flex items-center gap-3">
+              Session Progress - {selectedSession?.name}
+              <span className={`px-2 py-1 text-xs font-bold uppercase rounded ${
+                selectedSession?.status === 'reflection' ? 'bg-purple-100 text-purple-800' :
+                selectedSession?.status === 'critique' ? 'bg-orange-100 text-orange-800' :
+                selectedSession?.status === 'complete' ? 'bg-green-100 text-green-800' :
+                'bg-gray-100 text-gray-800'
+              }`}>
+                {selectedSession?.status}
+              </span>
+            </DialogTitle>
             <DialogDescription>
               Track student completion and feedback
             </DialogDescription>
@@ -379,7 +550,7 @@ export function OrganizerDashboard({ user, accessToken, onLogout }: OrganizerDas
                 <Card>
                   <CardHeader className="pb-2">
                     <CardDescription>Reflections Complete</CardDescription>
-                    <CardTitle className="text-3xl">{progress.completedReflections}</CardTitle>
+                    <CardTitle className="text-3xl">{progress.completedReflections}/{progress.totalStudents}</CardTitle>
                   </CardHeader>
                 </Card>
                 <Card>
@@ -415,6 +586,58 @@ export function OrganizerDashboard({ user, accessToken, onLogout }: OrganizerDas
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Phase transition controls */}
+              <div className="flex gap-3 pt-4 border-t">
+                {selectedSession?.status === 'reflection' && (
+                  <Button
+                    className="flex-1 bg-purple-800 hover:bg-purple-900"
+                    onClick={() => advanceSession(selectedSession)}
+                    disabled={progress.completedReflections === 0}
+                  >
+                    <FastForward className="w-4 h-4 mr-2" />
+                    Start Critique Phase
+                    {progress.completedReflections < progress.totalStudents && (
+                      <span className="ml-2 text-xs opacity-75">
+                        ({progress.completedReflections}/{progress.totalStudents} ready)
+                      </span>
+                    )}
+                  </Button>
+                )}
+
+                {selectedSession?.status === 'critique' && (
+                  <Button
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    onClick={() => completeSession(selectedSession)}
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    End Session
+                  </Button>
+                )}
+
+                {selectedSession?.status === 'complete' && (
+                  <>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => reopenSession(selectedSession, 'critique')}
+                    >
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      Reopen for More Feedback
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        archiveSession(selectedSession);
+                        setProgressDialogOpen(false);
+                      }}
+                    >
+                      <Archive className="w-4 h-4 mr-2" />
+                      Archive
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           )}

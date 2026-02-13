@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { AuthPage } from './components/auth-page';
 import { OrganizerDashboard } from './components/organizer-dashboard';
 import { StudentDashboard } from './components/student-dashboard';
+import { ErrorBoundary } from './components/error-boundary';
 import { Toaster } from './components/ui/sonner';
 import { getSupabaseClient } from '../utils/supabase/client';
 import { projectId, publicAnonKey } from '../../utils/supabase/info';
@@ -71,15 +72,19 @@ export default function App() {
   }
 
   return (
-    <>
+    <ErrorBoundary>
       {!user ? (
         <AuthPage onLogin={handleLogin} />
       ) : user.role === 'organizer' ? (
-        <OrganizerDashboard user={user} accessToken={accessToken} onLogout={handleLogout} />
+        <ErrorBoundary>
+          <OrganizerDashboard user={user} accessToken={accessToken} onLogout={handleLogout} />
+        </ErrorBoundary>
       ) : (
-        <StudentDashboard user={user} accessToken={accessToken} onLogout={handleLogout} />
+        <ErrorBoundary>
+          <StudentDashboard user={user} accessToken={accessToken} onLogout={handleLogout} />
+        </ErrorBoundary>
       )}
       <Toaster />
-    </>
+    </ErrorBoundary>
   );
 }

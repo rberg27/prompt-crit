@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
-import { Upload, Send, Sparkles } from 'lucide-react';
+import { Upload, Send, Sparkles, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { projectId } from '../../../utils/supabase/info';
 
@@ -20,7 +20,8 @@ interface Message {
   content: string;
 }
 
-const AI_QUESTIONS = [
+// Fallback static questions if Claude is unavailable
+const FALLBACK_QUESTIONS = [
   {
     question: "Let's start! What is your name and what did you build for this project?",
     followUp: "Tell me more about what motivated you to build this."
@@ -45,9 +46,11 @@ const AI_QUESTIONS = [
 
 export function AIReflection({ sessionId, accessToken, userEmail, onComplete }: AIReflectionProps) {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'ai', content: "Welcome! I'm here to help you reflect on your creative work. Let's have a thoughtful conversation about your project. " + AI_QUESTIONS[0].question }
+    { role: 'ai', content: "Welcome! I'm here to help you reflect on your creative work. Let's have a thoughtful conversation about your project. What is your name, and what did you build?" }
   ]);
   const [currentInput, setCurrentInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [useFallback, setUseFallback] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [needsFollowUp, setNeedsFollowUp] = useState(false);
   const [responses, setResponses] = useState<any>({});
@@ -87,8 +90,8 @@ export function AIReflection({ sessionId, accessToken, userEmail, onComplete }: 
     }
   };
 
-  const handleSendMessage = () => {
-    if (!currentInput.trim()) return;
+  const handleSendMessage = async () => {
+    if (!currentInput.trim() || isLoading) return;
 
     const userMessage: Message = { role: 'user', content: currentInput };
     const newMessages = [...messages, userMessage];
@@ -106,29 +109,62 @@ export function AIReflection({ sessionId, accessToken, userEmail, onComplete }: 
     saveReflection(updatedResponses, false);
 
     setCurrentInput('');
+    setIsLoading(true);
 
-    // Determine next AI response
-    setTimeout(() => {
-      let aiResponse = '';
+    // Try Claude API first, fall back to static if needed
+    if (!useFallback) {
+      try {
+        const response = await fetch(`https://${projectId}.supabase.co/functions/v1/make-server-5742cd96/ai-reflection`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({
+            messages: newMessages,
+            sessionId
+          })
+        });
 
-      if (!needsFollowUp && currentInput.length < 50) {
-        // Ask for more detail
-        aiResponse = AI_QUESTIONS[currentQuestionIndex].followUp;
-        setNeedsFollowUp(true);
-      } else if (currentQuestionIndex < AI_QUESTIONS.length - 1) {
-        // Move to next question
-        const nextIndex = currentQuestionIndex + 1;
-        setCurrentQuestionIndex(nextIndex);
-        setNeedsFollowUp(false);
-        aiResponse = "Thank you for sharing. " + AI_QUESTIONS[nextIndex].question;
-      } else {
-        // Finished all questions
-        aiResponse = "Thank you for this thoughtful reflection! Now, let's create a visual summary of your project. Please upload 3 screenshots that best represent your work.";
-        setShowSummary(true);
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          setMessages([...newMessages, { role: 'ai', content: data.message }]);
+
+          if (data.isComplete) {
+            setShowSummary(true);
+          }
+          setIsLoading(false);
+          return;
+        } else if (data.fallback) {
+          // Switch to fallback mode
+          console.log('Switching to fallback mode');
+          setUseFallback(true);
+        }
+      } catch (error) {
+        console.error('Claude API error:', error);
+        setUseFallback(true);
       }
+    }
 
-      setMessages([...newMessages, { role: 'ai', content: aiResponse }]);
-    }, 1000);
+    // Fallback to static questions
+    setIsLoading(false);
+    let aiResponse = '';
+
+    if (!needsFollowUp && currentInput.length < 50) {
+      aiResponse = FALLBACK_QUESTIONS[currentQuestionIndex].followUp;
+      setNeedsFollowUp(true);
+    } else if (currentQuestionIndex < FALLBACK_QUESTIONS.length - 1) {
+      const nextIndex = currentQuestionIndex + 1;
+      setCurrentQuestionIndex(nextIndex);
+      setNeedsFollowUp(false);
+      aiResponse = "Thank you for sharing. " + FALLBACK_QUESTIONS[nextIndex].question;
+    } else {
+      aiResponse = "Thank you for this thoughtful reflection! Now, let's create a visual summary of your project. Please upload 3 screenshots that best represent your work.";
+      setShowSummary(true);
+    }
+
+    setMessages([...newMessages, { role: 'ai', content: aiResponse }]);
   };
 
   const handleScreenshotUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -278,12 +314,13 @@ export function AIReflection({ sessionId, accessToken, userEmail, onComplete }: 
                 <Input
                   value={currentInput}
                   onChange={(e) => setCurrentInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                  placeholder="Type your response..."
+                  onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleSendMessage()}
+                  placeholder={isLoading ? "Thinking..." : "Type your response..."}
                   className="flex-1"
+                  disabled={isLoading}
                 />
-                <Button onClick={handleSendMessage}>
-                  <Send className="w-4 h-4" />
+                <Button onClick={handleSendMessage} disabled={isLoading || !currentInput.trim()}>
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </Button>
               </div>
             )}
